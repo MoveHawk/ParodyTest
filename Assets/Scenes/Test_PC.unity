@@ -1096,10 +1096,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCamera
   target: {fileID: 543450653259175915}
-  distance: 4
+  distance: 3
+  heightOffset: 1.5
   mouseSensitivity: 200
-  minY: -30
-  maxY: 70
+  minY: -20
+  maxY: 30
 --- !u!65 &330585549
 BoxCollider:
   m_ObjectHideFlags: 0

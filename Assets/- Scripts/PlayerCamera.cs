@@ -4,7 +4,9 @@ public class PlayerCamera : MonoBehaviour
 {
     [SerializeField] Transform target;
 
+    [Header("Camera Controls")]
     [SerializeField] float distance = 5f;
+    [SerializeField] float heightOffset = 1.5f;
     [SerializeField] float mouseSensitivity = 200f;
     [SerializeField] float minY = -30f;
     [SerializeField] float maxY = 70f;
@@ -12,24 +14,48 @@ public class PlayerCamera : MonoBehaviour
     float yaw;
     float pitch;
 
+    // Cached orbit axes
+    Vector3 camUp;
+    Vector3 camRight;
+
+    void Start()
+    {
+        camUp = target.up;
+        camRight = target.right;
+    }
+
     void LateUpdate()
     {
         if (!target) return;
 
+        // Mouse orbit input
         yaw += Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
         pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
         pitch = Mathf.Clamp(pitch, minY, maxY);
 
-        // Build rotation in local camera space, then transform to world space with target's up as 'up'
-        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
+        // If gravity shifted (player.up changed), update orbit axes
+        if (Vector3.Dot(camUp, target.up) < 0.999f)
+        {
+            camUp = target.up;
+            camRight = target.right;
+        }
 
-        // offset is relative to camera local axes; then we want it oriented in world using target.up
-        Vector3 offset = rotation * new Vector3(0, 0, -distance);
+        // Orbit rotation
+        Quaternion horizontalRot = Quaternion.AngleAxis(yaw, camUp);
+        Quaternion verticalRot = Quaternion.AngleAxis(pitch, camRight);
+        Quaternion finalRot = horizontalRot * verticalRot;
 
-        // Position camera relative to target
-        transform.position = target.position + offset;
+        // Offset
+        Vector3 offset = finalRot * (Vector3.back * distance);
+        Vector3 height = camUp * heightOffset;
 
-        // Look at the target but use target.up (so camera's up is player's up)
-        transform.rotation = Quaternion.LookRotation((target.position + target.up * 1.5f) - transform.position, target.up);
+        // Position
+        transform.position = target.position + height + offset;
+
+        // Look at player
+        transform.rotation = Quaternion.LookRotation(
+            (target.position + height) - transform.position,
+            camUp
+        );
     }
 }
