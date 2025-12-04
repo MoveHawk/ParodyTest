@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerController : MonoBehaviour
@@ -54,7 +54,9 @@ public class PlayerController : MonoBehaviour
         rb.MoveRotation(newRot);
     }
 
-    // ------------------ MOVEMENT (WASD only) -----------------------
+    // --------------------------------------------------------------
+    // MOVEMENT (WASD only)
+    // --------------------------------------------------------------
     void HandleMovement()
     {
         float h = (Input.GetKey(KeyCode.A) ? -1 : 0) + (Input.GetKey(KeyCode.D) ? 1 : 0);
@@ -69,9 +71,7 @@ public class PlayerController : MonoBehaviour
             Vector3 camForward = Vector3.ProjectOnPlane(cam.forward, up).normalized;
             Vector3 camRight = Vector3.ProjectOnPlane(cam.right, up).normalized;
 
-            Vector3 moveDir = camForward * v + camRight * h;
-            moveDir.Normalize();
-
+            Vector3 moveDir = (camForward * v + camRight * h).normalized;
             Vector3 desiredForward = Vector3.ProjectOnPlane(moveDir, up).normalized;
 
             targetRotation = Quaternion.LookRotation(desiredForward, up);
@@ -82,7 +82,9 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ------------------ JUMP / GROUND CHECK ------------------------
+    // --------------------------------------------------------------
+    // JUMP / GROUND CHECK
+    // --------------------------------------------------------------
     void HandleJump()
     {
         Vector3 downDir = currentGravity.normalized;
@@ -100,89 +102,118 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ------------------ ARROW KEYS SELECT GRAVITY -------------------
+    // --------------------------------------------------------------
+    // ARROW KEYS → LOCAL 90° GRAVITY ROTATION
+    // --------------------------------------------------------------
     void HandleGravitySelectionInput()
     {
         bool pressed = false;
-        Vector3 candidate = Vector3.zero;
+        Quaternion rotation = Quaternion.identity;
+
+        // ALWAYS use player's CURRENT orientation
+        Vector3 localX = transform.right;     // rotate around X for forward/back tilt
+        Vector3 localZ = transform.forward;   // rotate around Z for left/right roll
 
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
-            candidate = Vector3.up;
+            rotation = Quaternion.AngleAxis(-90f, localX);
             pressed = true;
         }
         else if (Input.GetKeyDown(KeyCode.DownArrow))
         {
-            candidate = Vector3.down;
+            rotation = Quaternion.AngleAxis(+90f, localX);
             pressed = true;
         }
         else if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
-            candidate = Vector3.left;
+            rotation = Quaternion.AngleAxis(-90f, localZ);
             pressed = true;
         }
         else if (Input.GetKeyDown(KeyCode.RightArrow))
         {
-            candidate = Vector3.right;
+            rotation = Quaternion.AngleAxis(+90f, localZ);
             pressed = true;
         }
 
         if (pressed)
         {
-            pendingGravity = candidate * gravityStrength;
+            // Rotate gravity relative to player's CURRENT local axes
+            pendingGravity = rotation * currentGravity;
             hasPendingGravity = true;
 
+            // Arrow shows new down direction
             GameManager.Instance?.ShowArrow();
-            GameManager.Instance?.UpdateArrowVisual(candidate);
+            GameManager.Instance?.UpdateArrowVisual(pendingGravity.normalized);
         }
 
         if (hasPendingGravity && Input.GetKeyDown(KeyCode.Return))
         {
             ApplyNewGravity(pendingGravity);
             hasPendingGravity = false;
-
             GameManager.Instance?.HideArrow();
         }
     }
 
-    // ------------------ APPLY NEW GRAVITY ---------------------------
+    // --------------------------------------------------------------
+    // APPLY GRAVITY & SNAP FORWARD USING PLAYER LOCAL AXES
+    // --------------------------------------------------------------
     void ApplyNewGravity(Vector3 newGravity)
     {
         currentGravity = newGravity;
 
         Vector3 newUp = -currentGravity.normalized;
 
-        // Snap forward to nearest cardinal direction
-        Vector3[] cardinals = {
-            Vector3.forward, Vector3.back, Vector3.right, Vector3.left
-        };
+        // Find player's CURRENT forward projected to new up-plane
+        Vector3 forwardCandidate = Vector3.ProjectOnPlane(transform.forward, newUp).normalized;
 
-        float best = -999f;
-        Vector3 bestDir = Vector3.forward;
+        if (forwardCandidate.sqrMagnitude < 0.01f)
+            forwardCandidate = Vector3.ProjectOnPlane(transform.right, newUp).normalized;
 
-        foreach (var c in cardinals)
-        {
-            float d = Vector3.Dot(transform.forward, c);
-            if (d > best)
-            {
-                best = d;
-                bestDir = c;
-            }
-        }
+        // SNAP using LOCAL axes, not world axes
+        forwardCandidate = SnapToLocalAxis(forwardCandidate);
 
-        Vector3 forwardCorrected = Vector3.ProjectOnPlane(bestDir, newUp).normalized;
-
-        targetRotation = Quaternion.LookRotation(forwardCorrected, newUp);
+        targetRotation = Quaternion.LookRotation(forwardCandidate, newUp);
 
         Vector3 horiz = Vector3.ProjectOnPlane(rb.linearVelocity, newUp);
         rb.linearVelocity = horiz;
     }
 
-    // ------------------ ANIMATIONS -------------------------------
+    // --------------------------------------------------------------
+    // SNAP TO NEAREST PLAYER-LOCAL AXIS (NOT WORLD AXES)
+    // --------------------------------------------------------------
+    Vector3 SnapToLocalAxis(Vector3 dir)
+    {
+        Vector3[] localAxes =
+        {
+            transform.forward,
+            -transform.forward,
+            transform.right,
+            -transform.right
+        };
+
+        float best = -999f;
+        Vector3 bestAxis = transform.forward;
+
+        foreach (var axis in localAxes)
+        {
+            float d = Vector3.Dot(dir, axis);
+            if (d > best)
+            {
+                best = d;
+                bestAxis = axis;
+            }
+        }
+
+        // Re-project to ensure perfect 90° alignment
+        return Vector3.ProjectOnPlane(bestAxis, -currentGravity.normalized).normalized;
+    }
+
+    // --------------------------------------------------------------
+    // ANIMATIONS
+    // --------------------------------------------------------------
     void HandleAnimations()
     {
         Vector3 up = -currentGravity.normalized;
-
         Vector3 horizontal = Vector3.ProjectOnPlane(rb.linearVelocity, up);
 
         bool running = horizontal.magnitude > 0.2f;
@@ -193,7 +224,9 @@ public class PlayerController : MonoBehaviour
         animator.SetBool("isIdle", !running && isGrounded);
     }
 
-    // ------------------ GIZMOS -------------------------------
+    // --------------------------------------------------------------
+    // GIZMOS
+    // --------------------------------------------------------------
     void OnDrawGizmos()
     {
         if (!Application.isPlaying) return;
