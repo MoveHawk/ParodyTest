@@ -4,8 +4,11 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Header("UI")]
-    [SerializeField] RectTransform arrowImage;
+    [Header("Gravity Hologram Previews")]
+    public GameObject holoUp;
+    public GameObject holoDown;
+    public GameObject holoLeft;
+    public GameObject holoRight;
 
     void Awake()
     {
@@ -19,62 +22,28 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // Default: show DOWN arrow
-        UpdateArrowVisual(Vector3.down);
-        HideArrow();
+        DisableAllHolograms();
     }
 
-    /// <summary>
-    /// Rotates arrow so UI arrow faces the closest matching cardinal direction.
-    /// Supports any arbitrary direction (from quaternion gravity rotation).
-    /// </summary>
-    public void UpdateArrowVisual(Vector3 direction)
+    public void DisableAllHolograms()
     {
-        if (arrowImage == null) return;
+        if (holoUp) holoUp.SetActive(false);
+        if (holoDown) holoDown.SetActive(false);
+        if (holoLeft) holoLeft.SetActive(false);
+        if (holoRight) holoRight.SetActive(false);
+    }
 
-        direction.Normalize();
+    // Call this when choosing a direction
+    public void ShowHologram(string name)
+    {
+        DisableAllHolograms();
 
-        // Find the closest axis (same logic you use in SnapToAxis)
-        Vector3[] axes =
+        switch (name)
         {
-            Vector3.up, Vector3.down,
-            Vector3.right, Vector3.left,
-            Vector3.forward, Vector3.back
-        };
-
-        float bestDot = -999f;
-        Vector3 bestAxis = Vector3.down; // default
-
-        foreach (var axis in axes)
-        {
-            float d = Vector3.Dot(direction, axis);
-            if (d > bestDot)
-            {
-                bestDot = d;
-                bestAxis = axis;
-            }
+            case "Up": if (holoUp) holoUp.SetActive(true); break;
+            case "Down": if (holoDown) holoDown.SetActive(true); break;
+            case "Left": if (holoLeft) holoLeft.SetActive(true); break;
+            case "Right": if (holoRight) holoRight.SetActive(true); break;
         }
-
-        float angle = 0f;
-
-        // Map cardinals to UI angles (sprite points UP by default)
-        if (bestAxis == Vector3.up) angle = 0f;
-        else if (bestAxis == Vector3.right) angle = -90f;
-        else if (bestAxis == Vector3.down) angle = 180f;
-        else if (bestAxis == Vector3.left) angle = 90f;
-        else if (bestAxis == Vector3.forward) angle = 0f;   // treat forward as up
-        else if (bestAxis == Vector3.back) angle = 180f;    // treat back as down
-
-        arrowImage.localEulerAngles = new Vector3(0, 0, angle);
-    }
-
-    public void ShowArrow()
-    {
-        if (arrowImage) arrowImage.gameObject.SetActive(true);
-    }
-
-    public void HideArrow()
-    {
-        if (arrowImage) arrowImage.gameObject.SetActive(false);
     }
 }
