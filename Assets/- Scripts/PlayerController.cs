@@ -65,9 +65,6 @@ public class PlayerController : MonoBehaviour
         rb.MoveRotation(newRot);
     }
 
-    // -----------------------
-    // Input for gravity rotate (selection + confirmation)
-    // -----------------------
     void HandleInput()
     {
         // Selection with arrow keys (do NOT immediately rotate or apply gravity)
@@ -132,16 +129,6 @@ public class PlayerController : MonoBehaviour
         return newGravityCandidate;
     }
 
-    // Rotate the current gravity vector around a local axis by angleDegrees (kept for compatibility; uses ApplyNewGravityWithRaycast)
-    void RotateGravityAroundLocalAxis(Vector3 localAxis, float angleDegrees)
-    {
-        Vector3 newGravityCandidate = ComputeGravityCandidate(localAxis, angleDegrees);
-        ApplyNewGravityWithRaycast(newGravityCandidate);
-    }
-
-    // -----------------------
-    // Movement
-    // -----------------------
     void HandleMovement()
     {
         // Using axis input so camera-relative movement still works with controllers/keys
@@ -181,9 +168,6 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = horizVel + verticalVel;
     }
 
-    // -----------------------
-    // Jump & Ground Check
-    // -----------------------
     void HandleJump()
     {
         Vector3 gravityDir = currentGravity.normalized;   // points toward ground
@@ -201,9 +185,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // -----------------------
-    // Apply gravity candidate (with raycast alignment)
-    // -----------------------
     void ApplyNewGravityWithRaycast(Vector3 newGravityCandidate)
     {
         // Capture old up BEFORE we change gravity so we can preserve heading.
@@ -263,7 +244,6 @@ public class PlayerController : MonoBehaviour
 
         forwardCandidate.Normalize();
 
-        // IMPORTANT: Do NOT snap this forwardCandidate to local axes here — we must preserve heading.
         // Set target rotation so the player stands perpendicular to the new up while preserving heading (yaw)
         targetRotation = Quaternion.LookRotation(forwardCandidate, chosenUp);
 
@@ -273,38 +253,19 @@ public class PlayerController : MonoBehaviour
 
     }
 
-    // Snap a direction to the nearest of the 4 local horizontal axes projected onto the chosenUp plane.
-    Vector3 SnapToLocalAxisOnPlane(Vector3 dirOnPlane, Vector3 up)
+    void OnTriggerEnter(Collider other)
     {
-        dirOnPlane.Normalize();
-
-        Vector3[] localAxes =
+        if (other.CompareTag("Points"))
         {
-            Vector3.ProjectOnPlane(transform.forward, up).normalized,
-            Vector3.ProjectOnPlane(-transform.forward, up).normalized,
-            Vector3.ProjectOnPlane(transform.right, up).normalized,
-            Vector3.ProjectOnPlane(-transform.right, up).normalized
-        };
-
-        float best = -Mathf.Infinity;
-        Vector3 bestAxis = dirOnPlane;
-        foreach (var axis in localAxes)
-        {
-            if (axis.sqrMagnitude < 0.0001f) continue;
-            float d = Vector3.Dot(dirOnPlane, axis.normalized);
-            if (d > best)
-            {
-                best = d;
-                bestAxis = axis.normalized;
-            }
+            GameManager.Instance?.CollectPoint(other.gameObject);
         }
 
-        return bestAxis;
+        if (other.CompareTag("Finish"))
+        {
+            GameManager.Instance?.TriggerLose();
+        }
     }
 
-    // -----------------------
-    // Animations
-    // -----------------------
     void HandleAnimations()
     {
         if (!animator) return;
